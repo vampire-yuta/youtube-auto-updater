@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  description.txt: |
+    ご視聴ありがとうございます。
+    チャンネル登録・高評価よろしくお願いします。
+
+    #ひとり社長 #インフラエンジニア #フリーランス

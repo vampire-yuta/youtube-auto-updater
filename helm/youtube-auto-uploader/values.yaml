@@ -1,0 +1,23 @@
+replicaCount: 1
+
+image:
+  repository: youtube-auto-uploader
+  tag: latest
+  pullPolicy: Never  # ローカルビルドイメージを使用
+
+service:
+  type: NodePort
+  port: 8080
+  nodePort: 30080
+
+env:
+  BGM_VOLUME: "0.1"
+  FONT_SIZE: "80"
+  YOUTUBE_CATEGORY_ID: "22"
+  PUBLISH_DELAY_MINUTES: "60"
+
+# YouTube OAuth2認証情報（base64エンコード済み）
+# 実際の値はデプロイ時に --set で上書き
+secrets:
+  clientSecret: ""
+  token: ""

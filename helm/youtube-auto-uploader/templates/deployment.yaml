@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BGM_VOLUME
+              value: {{ .Values.env.BGM_VOLUME | quote }}
+            - name: FONT_SIZE
+              value: {{ .Values.env.FONT_SIZE | quote }}
+            - name: YOUTUBE_CATEGORY_ID
+              value: {{ .Values.env.YOUTUBE_CATEGORY_ID | quote }}
+            - name: PUBLISH_DELAY_MINUTES
+              value: {{ .Values.env.PUBLISH_DELAY_MINUTES | quote }}
+            - name: CLIENT_SECRET_FILE
+              value: "/app/secrets/client_secret.json"
+            - name: TOKEN_FILE
+              value: "/app/secrets/token.json"
+            - name: DESCRIPTION_FILE
+              value: "/app/config/description.txt"
+          volumeMounts:
+            - name: youtube-secrets
+              mountPath: /app/secrets
+              readOnly: true
+            - name: description
+              mountPath: /app/config
+              readOnly: true
+      volumes:
+        - name: youtube-secrets
+          secret:
+            secretName: {{ .Release.Name }}-youtube-auth
+        - name: description
+          configMap:
+            name: {{ .Release.Name }}-config
