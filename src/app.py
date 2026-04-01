@@ -25,7 +25,7 @@ templates = Jinja2Templates(directory="/app/templates")
 # 設定（環境変数 or デフォルト）
 ASSETS_DIR = Path(os.getenv("ASSETS_DIR", "/app/assets"))
 BGM_FILE = ASSETS_DIR / "bgm.mp3"
-FONT_FILE = ASSETS_DIR / "font.ttf"
+FONT_FILE = Path(os.getenv("FONT_FILE", "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"))
 BGM_VOLUME = float(os.getenv("BGM_VOLUME", "0.1"))
 FONT_SIZE = int(os.getenv("FONT_SIZE", "80"))
 DESCRIPTION_FILE = Path(os.getenv("DESCRIPTION_FILE", "/app/config/description.txt"))

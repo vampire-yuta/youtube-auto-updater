@@ -52,7 +52,7 @@ uninstall:
 
 .PHONY: port-forward
 port-forward:
-	kubectl port-forward svc/$(RELEASE_NAME) 8080:8080
+	kubectl port-forward svc/$(RELEASE_NAME) 8081:8080
 
 # === 一括操作 ===
 
@@ -65,7 +65,7 @@ setup: cluster-create build load install
 	@echo "セットアップ完了。次のステップ:"
 	@echo "  1. make secret CLIENT_SECRET=path/to/client_secret.json TOKEN=path/to/token.json"
 	@echo "  2. make port-forward"
-	@echo "  3. http://localhost:8080 にアクセス"
+	@echo "  3. http://localhost:8081 にアクセス"
 
 # === ログ & 状態確認 ===
 
