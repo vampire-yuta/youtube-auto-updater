@@ -73,19 +73,43 @@
             background: #3d0000;
             border: 1px solid #6b0000;
         }
-        .loading {
+        #progress {
             display: none;
-            text-align: center;
-            margin-top: 1rem;
-            color: #aaa;
+            margin-top: 1.5rem;
         }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.4rem 0;
+            font-size: 0.95rem;
+            color: #666;
+        }
+        .step.active { color: #eee; }
+        .step.done { color: #95d5b2; }
+        .step.error { color: #e94560; }
+        .step-icon {
+            width: 1.2rem;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #444;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>YouTube Auto Uploader</h1>
 
-        <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+        <form id="uploadForm">
             <label for="title">タイトル</label>
             <input type="text" id="title" name="title" required placeholder="動画のタイトル">
 
@@ -106,26 +130,136 @@
             <button type="submit" id="submitBtn">アップロード</button>
         </form>
 
-        <div class="loading" id="loading">処理中... しばらくお待ちください</div>
-
-        {% if success %}
-        <div class="message success">
-            アップロード完了: <strong>{{ title }}</strong><br>
-            <a href="{{ youtube_url }}" target="_blank">{{ youtube_url }}</a>
+        <div id="progress">
+            <div class="step" id="step-receive">
+                <span class="step-icon" id="icon-receive">-</span>
+                <span>動画送信 <span id="receive-pct"></span></span>
+            </div>
+            <div class="step" id="step-bgm">
+                <span class="step-icon" id="icon-bgm">-</span>
+                <span>BGM合成</span>
+            </div>
+            <div class="step" id="step-thumbnail">
+                <span class="step-icon" id="icon-thumbnail">-</span>
+                <span>サムネイル生成</span>
+            </div>
+            <div class="step" id="step-auth">
+                <span class="step-icon" id="icon-auth">-</span>
+                <span>YouTube認証</span>
+            </div>
+            <div class="step" id="step-upload">
+                <span class="step-icon" id="icon-upload">-</span>
+                <span>YouTubeアップロード</span>
+            </div>
+            <div class="step" id="step-thumbnail_set">
+                <span class="step-icon" id="icon-thumbnail_set">-</span>
+                <span>サムネイル設定</span>
+            </div>
         </div>
-        {% endif %}
 
-        {% if error %}
-        <div class="message error">
-            エラー: {{ error }}
-        </div>
-        {% endif %}
+        <div id="result"></div>
     </div>
 
     <script>
-        document.getElementById("uploadForm").addEventListener("submit", function() {
-            document.getElementById("submitBtn").disabled = true;
-            document.getElementById("loading").style.display = "block";
+        const form = document.getElementById("uploadForm");
+        const submitBtn = document.getElementById("submitBtn");
+        const progressDiv = document.getElementById("progress");
+        const resultDiv = document.getElementById("result");
+
+        function setStep(step, status) {
+            const el = document.getElementById("step-" + step);
+            const icon = document.getElementById("icon-" + step);
+            if (!el || !icon) return;
+
+            el.className = "step";
+            if (status === "running") {
+                el.classList.add("active");
+                icon.innerHTML = '<span class="spinner"></span>';
+            } else if (status === "done") {
+                el.classList.add("done");
+                icon.textContent = "\u2713";
+            } else if (status === "error") {
+                el.classList.add("error");
+                icon.textContent = "\u2717";
+            }
+        }
+
+        form.addEventListener("submit", async function(e) {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            progressDiv.style.display = "block";
+            resultDiv.innerHTML = "";
+
+            // リセット
+            ["receive","bgm","thumbnail","auth","upload","thumbnail_set"].forEach(s => {
+                const el = document.getElementById("step-" + s);
+                const icon = document.getElementById("icon-" + s);
+                if (el) el.className = "step";
+                if (icon) icon.textContent = "-";
+            });
+
+            const formData = new FormData(form);
+            const pctEl = document.getElementById("receive-pct");
+
+            setStep("receive", "running");
+            pctEl.textContent = "0%";
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload");
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    pctEl.textContent = pct + "%";
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status !== 200) {
+                    resultDiv.innerHTML = '<div class="message error">\u30a8\u30e9\u30fc: HTTP ' + xhr.status + '</div>';
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                const data = JSON.parse(xhr.responseText);
+                setStep("receive", "done");
+                pctEl.textContent = "";
+
+                const evtSource = new EventSource("/progress/" + data.job_id);
+                evtSource.onmessage = function(e) {
+                    const event = JSON.parse(e.data);
+
+                    if (event.step === "complete") {
+                        evtSource.close();
+                        resultDiv.innerHTML = '<div class="message success">' +
+                            '\u30a2\u30c3\u30d7\u30ed\u30fc\u30c9\u5b8c\u4e86<br>' +
+                            '<a href="' + event.detail + '" target="_blank">' + event.detail + '</a></div>';
+                        submitBtn.disabled = false;
+                        return;
+                    }
+
+                    if (event.step === "error") {
+                        evtSource.close();
+                        resultDiv.innerHTML = '<div class="message error">\u30a8\u30e9\u30fc: ' + event.detail + '</div>';
+                        submitBtn.disabled = false;
+                        return;
+                    }
+
+                    setStep(event.step, event.status);
+                };
+
+                evtSource.onerror = function() {
+                    evtSource.close();
+                    submitBtn.disabled = false;
+                };
+            };
+
+            xhr.onerror = function() {
+                resultDiv.innerHTML = '<div class="message error">\u30a8\u30e9\u30fc: \u901a\u4fe1\u5931\u6557</div>';
+                submitBtn.disabled = false;
+            };
+
+            xhr.send(formData);
         });
     </script>
 </body>
