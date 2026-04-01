@@ -128,11 +128,22 @@ def set_thumbnail(service, video_id: str, thumbnail_path: str):
     ).execute()
 
 
-def _resumable_upload(request):
+def _resumable_upload(request, max_retries=5):
     """リジューム可能なアップロードを実行する。"""
+    import time
+    import httplib2
+
     response = None
+    retry = 0
     while response is None:
-        status, response = request.next_chunk()
-        if status:
-            print(f"  アップロード進捗: {int(status.progress() * 100)}%")
+        try:
+            status, response = request.next_chunk(num_retries=3)
+            if status:
+                print(f"  アップロード進捗: {int(status.progress() * 100)}%")
+        except httplib2.HttpLib2Error as e:
+            retry += 1
+            if retry > max_retries:
+                raise RuntimeError(f"アップロード失敗（リトライ上限）: {e}")
+            print(f"  通信エラー、リトライ {retry}/{max_retries}: {e}")
+            time.sleep(2 ** retry)
     return response
