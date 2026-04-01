@@ -11,7 +11,7 @@ from googleapiclient.http import MediaFileUpload
 import json
 from pathlib import Path
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = ["https://www.googleapis.com/auth/youtube"]
 
 
 def get_authenticated_service(client_secret_file: str, token_file: str):

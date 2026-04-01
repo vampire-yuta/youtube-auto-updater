@@ -12,9 +12,8 @@ def extract_frame(video_path: str) -> str:
     Returns:
         切り出した画像の一時ファイルパス（JPEG）
     """
-    # 動画の長さを取得
-    duration = _get_duration(video_path)
-    midpoint = duration / 2
+    # 開始10秒のフレームを切り出し
+    seek_sec = 10.0
 
     output = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
     output_path = output.name
@@ -22,7 +21,7 @@ def extract_frame(video_path: str) -> str:
 
     cmd = [
         "ffmpeg", "-y",
-        "-ss", str(midpoint),
+        "-ss", str(seek_sec),
         "-i", video_path,
         "-frames:v", "1",
         "-q:v", "2",
@@ -41,13 +40,13 @@ def add_text_to_image(
     text: str,
     font_file: str,
     font_size: int = 80,
-    font_color: str = "white",
+    font_color: str = "red",
     stroke_color: str = "black",
-    stroke_width: int = 3,
+    stroke_width: int = 8,
 ) -> str:
     """画像にテキストを合成する。
 
-    テキストは画像下部中央に配置。白文字に黒縁取り。
+    テキストは画像中央に配置。赤文字に黒縁取り。サイズは画像幅の70%に自動調整。
 
     Returns:
         テキスト合成済み画像の一時ファイルパス（JPEG）
@@ -55,16 +54,24 @@ def add_text_to_image(
     img = Image.open(image_path)
     draw = ImageDraw.Draw(img)
 
-    font = ImageFont.truetype(font_file, font_size)
+    # 画像幅の95%に収まるようフォントサイズを自動計算
+    target_width = img.width * 0.95
+    font_size = 500  # 大きめから開始して縮小
+    while font_size > 10:
+        font = ImageFont.truetype(font_file, font_size)
+        bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
+        text_width = bbox[2] - bbox[0]
+        if text_width <= target_width:
+            break
+        font_size -= 5
 
-    # テキストのサイズを取得
     bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
-    # 画像下部中央に配置（下から10%の位置）
+    # 画像中央に配置
     x = (img.width - text_width) / 2
-    y = img.height - text_height - (img.height * 0.1)
+    y = (img.height - text_height) / 2
 
     draw.text(
         (x, y),
@@ -87,10 +94,10 @@ def generate_thumbnail(
     video_path: str,
     text: str,
     font_file: str,
-    font_size: int = 80,
-    font_color: str = "white",
+    font_size: int = 200,
+    font_color: str = "red",
     stroke_color: str = "black",
-    stroke_width: int = 3,
+    stroke_width: int = 8,
 ) -> str:
     """動画からサムネイルを生成する（フレーム切り出し + テキスト合成）。
 
