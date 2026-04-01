@@ -4,7 +4,24 @@ metadata:
   name: {{ .Release.Name }}-config
 data:
   description.txt: |
-    ご視聴ありがとうございます。
-    チャンネル登録・高評価よろしくお願いします。
+    🦇Linux、WIndowsServerなどの技術が学べる動画教材
+    https://infracollege.vamdemicsystem.black
 
-    #ひとり社長 #インフラエンジニア #フリーランス
+    🦇Terraformで作りながら学ぶAzure講座
+    https://www.udemy.com/course/hashicorp-terraform-azure-devops-iac/?referralCode=445E8E708E1CFD2FDEF7
+
+    🦇ActiveDirectory実践講座(WindowsServer2022対応)
+    https://www.udemy.com/course/activedirectorywindowsserver/?referralCode=23F6E09FECDCB261B391
+
+    🦇Kindle本
+    https://www.amazon.co.jp/gp/product/B087ZM5CYH/ref=kinw_myk_ro_titl
+
+    🦇ヴァンデくんLINEスタンプ
+    https://store.line.me/stickershop/product/10720970/ja
+
+    🦇ホームページ
+    https://vamdemicsystem.black/
+
+    🦇お問い合わせはこちらから
+    問い合わせフォーム：https://vamdemicsystem.black/?page_id=1819
+    メール：yuta@vamdemicsystem.black

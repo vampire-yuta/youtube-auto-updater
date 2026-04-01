@@ -50,6 +50,7 @@ async def upload(
     request: Request,
     title: str = Form(...),
     thumbnail_text: str = Form(...),
+    publish_timing: str = Form(...),
     video: UploadFile = File(...),
 ):
     tmp_dir = tempfile.mkdtemp()
@@ -89,7 +90,7 @@ async def upload(
             title=title,
             description=description,
             category_id=CATEGORY_ID,
-            publish_delay_minutes=PUBLISH_DELAY,
+            publish_timing=publish_timing,
         )
         log.info(f"アップロード完了: {video_id}")
 

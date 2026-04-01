@@ -6,9 +6,8 @@ image:
   pullPolicy: Never  # ローカルビルドイメージを使用
 
 service:
-  type: NodePort
+  type: LoadBalancer
   port: 8080
-  nodePort: 30080
 
 env:
   BGM_VOLUME: "0.1"

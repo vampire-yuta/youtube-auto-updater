@@ -3,16 +3,28 @@ IMAGE_TAG := latest
 RELEASE_NAME := youtube-uploader
 HELM_CHART := helm/youtube-auto-uploader
 KIND_CLUSTER := youtube-uploader
+MINIKUBE_PROFILE := youtube-uploader
+
+# ランタイム: kind or minikube (デフォルト: kind)
+RUNTIME ?= kind
 
 # === クラスタ ===
 
 .PHONY: cluster-create
 cluster-create:
+ifeq ($(RUNTIME),minikube)
+	minikube start --profile $(MINIKUBE_PROFILE)
+else
 	kind create cluster --name $(KIND_CLUSTER)
+endif
 
 .PHONY: cluster-delete
 cluster-delete:
+ifeq ($(RUNTIME),minikube)
+	minikube delete --profile $(MINIKUBE_PROFILE)
+else
 	kind delete cluster --name $(KIND_CLUSTER)
+endif
 
 # === ビルド & ロード ===
 
@@ -22,7 +34,11 @@ build:
 
 .PHONY: load
 load:
+ifeq ($(RUNTIME),minikube)
+	minikube image load $(IMAGE_NAME):$(IMAGE_TAG) --profile $(MINIKUBE_PROFILE)
+else
 	kind load docker-image $(IMAGE_NAME):$(IMAGE_TAG) --name $(KIND_CLUSTER)
+endif
 
 # === Secret作成 ===
 # 使い方: make secret CLIENT_SECRET=path/to/client_secret.json TOKEN=path/to/token.json

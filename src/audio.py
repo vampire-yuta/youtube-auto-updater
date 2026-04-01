@@ -30,7 +30,7 @@ def mix_bgm(video_path: str, bgm_path: str, bgm_volume: float = 0.1) -> str:
         "-stream_loop", "-1",
         "-i", bgm_path,
         "-filter_complex",
-        f"[1:a]volume={bgm_volume}[bgm];[0:a][bgm]amix=inputs=2:duration=first",
+        f"[0:a]volume=2.0[voice];[1:a]volume={bgm_volume}[bgm];[voice][bgm]amix=inputs=2:duration=first",
         "-c:v", "copy",
         "-shortest",
         output_path,

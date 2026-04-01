@@ -34,7 +34,7 @@
             font-size: 0.9rem;
             color: #aaa;
         }
-        input[type="text"], input[type="file"] {
+        select, input[type="text"], input[type="file"] {
             width: 100%;
             padding: 0.7rem;
             margin-bottom: 1rem;
@@ -91,6 +91,14 @@
 
             <label for="thumbnail_text">サムネイル文字</label>
             <input type="text" id="thumbnail_text" name="thumbnail_text" required placeholder="サムネに表示するテキスト">
+
+            <label for="publish_timing">公開タイミング</label>
+            <select id="publish_timing" name="publish_timing">
+                <option value="now">すぐ公開</option>
+                <option value="1hour" selected>1時間後</option>
+                <option value="2hour">2時間後</option>
+                <option value="tomorrow_18">明日の18時</option>
+            </select>
 
             <label for="video">動画ファイル</label>
             <input type="file" id="video" name="video" accept="video/mp4" required>

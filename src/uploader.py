@@ -9,21 +9,27 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 import json
+import shutil
 from pathlib import Path
 
 SCOPES = ["https://www.googleapis.com/auth/youtube"]
+WRITABLE_TOKEN_PATH = Path("/tmp/youtube-token.json")
 
 
 def get_authenticated_service(client_secret_file: str, token_file: str):
     """YouTube APIの認証済みサービスを返す。
 
-    初回はブラウザ認証。以降はトークンファイルを再利用。
+    K8s SecretはReadOnlyなので、トークンを書き込み可能な場所にコピーして使う。
     """
     creds = None
     token_path = Path(token_file)
 
-    if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    # 初回: Secretから書き込み可能な場所にコピー
+    if not WRITABLE_TOKEN_PATH.exists() and token_path.exists():
+        shutil.copy2(str(token_path), str(WRITABLE_TOKEN_PATH))
+
+    if WRITABLE_TOKEN_PATH.exists():
+        creds = Credentials.from_authorized_user_file(str(WRITABLE_TOKEN_PATH), SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -32,10 +38,29 @@ def get_authenticated_service(client_secret_file: str, token_file: str):
             flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
             creds = flow.run_local_server(port=0)
 
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(creds.to_json())
+        WRITABLE_TOKEN_PATH.write_text(creds.to_json())
 
     return build("youtube", "v3", credentials=creds)
+
+
+def _calc_publish_at(publish_timing: str) -> datetime | None:
+    """公開タイミングからpublishAt日時を計算する。Noneなら即公開。"""
+    now = datetime.now(timezone.utc)
+    jst = timezone(timedelta(hours=9))
+
+    if publish_timing == "now":
+        return None
+    elif publish_timing == "1hour":
+        return now + timedelta(hours=1)
+    elif publish_timing == "2hour":
+        return now + timedelta(hours=2)
+    elif publish_timing == "tomorrow_18":
+        tomorrow = (datetime.now(jst) + timedelta(days=1)).replace(
+            hour=18, minute=0, second=0, microsecond=0
+        )
+        return tomorrow.astimezone(timezone.utc)
+    else:
+        return now + timedelta(hours=1)
 
 
 def upload_video(
@@ -44,9 +69,9 @@ def upload_video(
     title: str,
     description: str,
     category_id: str = "22",
-    publish_delay_minutes: int = 60,
+    publish_timing: str = "1hour",
 ) -> str:
-    """動画をYouTubeに非公開アップロードし、公開予約を設定する。
+    """動画をYouTubeにアップロードする。
 
     Args:
         service: YouTube APIサービス
@@ -54,12 +79,24 @@ def upload_video(
         title: 動画タイトル
         description: 動画の説明文
         category_id: YouTubeカテゴリID
-        publish_delay_minutes: アップロードから公開までの待ち時間（分）
+        publish_timing: 公開タイミング (now, 1hour, 2hour, tomorrow_18)
 
     Returns:
         アップロードされた動画のID
     """
-    publish_at = datetime.now(timezone.utc) + timedelta(minutes=publish_delay_minutes)
+    publish_at = _calc_publish_at(publish_timing)
+
+    if publish_at is None:
+        status = {
+            "privacyStatus": "public",
+            "selfDeclaredMadeForKids": False,
+        }
+    else:
+        status = {
+            "privacyStatus": "private",
+            "publishAt": publish_at.isoformat(),
+            "selfDeclaredMadeForKids": False,
+        }
 
     body = {
         "snippet": {
@@ -67,11 +104,7 @@ def upload_video(
             "description": description,
             "categoryId": category_id,
         },
-        "status": {
-            "privacyStatus": "private",
-            "publishAt": publish_at.isoformat(),
-            "selfDeclaredMadeForKids": False,
-        },
+        "status": status,
     }
 
     media = MediaFileUpload(video_path, chunksize=10 * 1024 * 1024, resumable=True)
