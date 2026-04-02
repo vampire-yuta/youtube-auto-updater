@@ -1,4 +1,5 @@
 .venv
-config
+config/*
+!config/description.txt
 assets/bgm.mp3
 __pycache__/
