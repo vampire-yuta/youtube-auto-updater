@@ -54,18 +54,25 @@ def add_text_to_image(
     img = Image.open(image_path)
     draw = ImageDraw.Draw(img)
 
-    # 画像幅の95%に収まるようフォントサイズを自動計算
+    # スペースがあれば改行に変換（複数行対応）
+    lines = text.split(" ")
+
+    # 最長行が画像幅の95%に収まるようフォントサイズを自動計算
     target_width = img.width * 0.95
     font_size = 500  # 大きめから開始して縮小
     while font_size > 10:
         font = ImageFont.truetype(font_file, font_size)
-        bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
-        text_width = bbox[2] - bbox[0]
-        if text_width <= target_width:
+        max_line_width = max(
+            draw.textbbox((0, 0), line, font=font, stroke_width=stroke_width)[2]
+            - draw.textbbox((0, 0), line, font=font, stroke_width=stroke_width)[0]
+            for line in lines
+        )
+        if max_line_width <= target_width:
             break
         font_size -= 5
 
-    bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
+    multiline_text = "\n".join(lines)
+    bbox = draw.multiline_textbbox((0, 0), multiline_text, font=font, stroke_width=stroke_width)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
@@ -73,13 +80,14 @@ def add_text_to_image(
     x = (img.width - text_width) / 2
     y = (img.height - text_height) / 2
 
-    draw.text(
+    draw.multiline_text(
         (x, y),
-        text,
+        multiline_text,
         font=font,
         fill=font_color,
         stroke_fill=stroke_color,
         stroke_width=stroke_width,
+        align="center",
     )
 
     output = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
