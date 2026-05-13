@@ -140,7 +140,7 @@ def _resumable_upload(request, max_retries=5):
             status, response = request.next_chunk(num_retries=3)
             if status:
                 print(f"  アップロード進捗: {int(status.progress() * 100)}%")
-        except httplib2.HttpLib2Error as e:
+        except (httplib2.HttpLib2Error, TimeoutError, ConnectionError, OSError) as e:
             retry += 1
             if retry > max_retries:
                 raise RuntimeError(f"アップロード失敗（リトライ上限）: {e}")
