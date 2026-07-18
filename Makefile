@@ -2,98 +2,55 @@ IMAGE_NAME := youtube-auto-uploader
 IMAGE_TAG := latest
 RELEASE_NAME := youtube-uploader
 HELM_CHART := helm/youtube-auto-uploader
-KIND_CLUSTER := youtube-uploader
-MINIKUBE_PROFILE := youtube-uploader
+KUBE_CTX := onprem-k3s
+NAMESPACE := youtube-uploader
+SERVER := yuta@172.16.0.51
 
-# ランタイム: kind or minikube (デフォルト: kind)
-RUNTIME ?= kind
+CLIENT_SECRET ?= config/client_secret.json
+TOKEN ?= config/token.json
 
-# === クラスタ ===
+.PHONY: build image-load secret install upgrade uninstall deploy logs status port-forward
 
-.PHONY: cluster-create
-cluster-create:
-ifeq ($(RUNTIME),minikube)
-	minikube start --profile $(MINIKUBE_PROFILE)
-else
-	kind create cluster --name $(KIND_CLUSTER)
-endif
+# === ビルド & 取り込み ===
 
-.PHONY: cluster-delete
-cluster-delete:
-ifeq ($(RUNTIME),minikube)
-	minikube delete --profile $(MINIKUBE_PROFILE)
-else
-	kind delete cluster --name $(KIND_CLUSTER)
-endif
-
-# === ビルド & ロード ===
-
-.PHONY: build
 build:
 	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
-.PHONY: load
-load:
-ifeq ($(RUNTIME),minikube)
-	minikube image load $(IMAGE_NAME):$(IMAGE_TAG) --profile $(MINIKUBE_PROFILE)
-else
-	kind load docker-image $(IMAGE_NAME):$(IMAGE_TAG) --name $(KIND_CLUSTER)
-endif
+image-load: build
+	docker save $(IMAGE_NAME):$(IMAGE_TAG) -o /tmp/$(IMAGE_NAME).tar
+	scp /tmp/$(IMAGE_NAME).tar $(SERVER):/tmp/
+	ssh $(SERVER) "sudo -n k3s ctr images import /tmp/$(IMAGE_NAME).tar && rm /tmp/$(IMAGE_NAME).tar"
+	rm -f /tmp/$(IMAGE_NAME).tar
 
 # === Secret作成 ===
-# 使い方: make secret CLIENT_SECRET=path/to/client_secret.json TOKEN=path/to/token.json
+# make secret CLIENT_SECRET=config/client_secret.json TOKEN=config/token.json
 
-.PHONY: secret
 secret:
-	kubectl create secret generic $(RELEASE_NAME)-youtube-auth \
+	kubectl --context $(KUBE_CTX) -n $(NAMESPACE) create secret generic $(RELEASE_NAME)-youtube-auth \
 		--from-file=client_secret.json=$(CLIENT_SECRET) \
 		--from-file=token.json=$(TOKEN) \
-		--dry-run=client -o yaml | kubectl apply -f -
+		--dry-run=client -o yaml | kubectl --context $(KUBE_CTX) -n $(NAMESPACE) apply -f -
 
 # === Helm ===
 
-.PHONY: install
 install:
-	helm install $(RELEASE_NAME) $(HELM_CHART)
+	helm upgrade --install $(RELEASE_NAME) $(HELM_CHART) --kube-context $(KUBE_CTX) -n $(NAMESPACE) --create-namespace
 
-.PHONY: upgrade
 upgrade:
-	helm upgrade $(RELEASE_NAME) $(HELM_CHART)
+	helm upgrade $(RELEASE_NAME) $(HELM_CHART) --kube-context $(KUBE_CTX) -n $(NAMESPACE)
 
-.PHONY: uninstall
 uninstall:
-	helm uninstall $(RELEASE_NAME)
+	helm uninstall $(RELEASE_NAME) --kube-context $(KUBE_CTX) -n $(NAMESPACE)
 
-# === アクセス ===
+deploy: image-load upgrade
 
-.PHONY: port-forward
+# === アクセス & 状態 ===
+
 port-forward:
-	kubectl port-forward svc/$(RELEASE_NAME) 8081:8080
+	kubectl --context $(KUBE_CTX) -n $(NAMESPACE) port-forward svc/$(RELEASE_NAME) 8081:8080
 
-# === 一括操作 ===
-
-.PHONY: deploy
-deploy: build load upgrade
-
-.PHONY: setup
-setup: cluster-create build load install
-	@echo ""
-	@echo "セットアップ完了。次のステップ:"
-	@echo "  1. make secret CLIENT_SECRET=path/to/client_secret.json TOKEN=path/to/token.json"
-	@echo "  2. make port-forward"
-	@echo "  3. http://localhost:8081 にアクセス"
-
-# === ログ & 状態確認 ===
-
-.PHONY: logs
 logs:
-	kubectl logs -f deploy/$(RELEASE_NAME)
+	kubectl --context $(KUBE_CTX) -n $(NAMESPACE) logs -f deploy/$(RELEASE_NAME)
 
-.PHONY: status
 status:
-	kubectl get pods -l app=$(RELEASE_NAME)
-
-# === クリーンアップ ===
-
-.PHONY: clean
-clean: uninstall cluster-delete
+	kubectl --context $(KUBE_CTX) -n $(NAMESPACE) get pod,svc -l app=$(RELEASE_NAME)
